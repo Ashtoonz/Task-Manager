@@ -1,65 +1,223 @@
+:root {
+    /* Color Variables */
+    --color-background: #161616;
+    --color-card: #252525;
+    --color-text: #FDFDFD;
+    --color-accent: #00BFFF;
+    --color-subtle-bg: #1e1e1e;
+    --color-button-bg: var(--color-card);
+    
+    /* Layout & Dimension Variables */
+    --spacing-xs: 5px;
+    --spacing-sm: 10px;
+    --spacing-lg: 20px;
+    --board-width: 300px;
+    --border-radius: 10px;
+    --button-size: 25px;
+    --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* GLOBAL STYLES     */
 body {
-    background-color: #FDFDFD;
+    background-color: var(--color-background);
     margin: 0%;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: var(--font-family);
 }
 
 header {
-    background-color: #252525;
-    color: #FDFDFD;
-    padding: 15px;
+    background-color: var(--color-card);
+    color: var(--color-text);
+    padding: var(--spacing-lg);
 }
 
 header > #title > h1 {
     margin: 0%;
 }
 
+/* BOARD LAYOUT      */
 #task-board {
-    justify-content: center;
+    justify-content: left;
     display: flex;
 }
 
-.task-list {
-    margin: 0%;
+.board,
+#board-form {
+    min-width: var(--board-width);
+    max-width: var(--board-width);
+    background-color: var(--color-card);
+    color: var(--color-text);
+    margin: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    height: fit-content;
+    border-radius: var(--border-radius);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
 }
 
 .board {
-    min-width: 300px;
-    max-width: 300px;
-    background-color: #252525;
-    color: #FDFDFD;
-    margin: 10px;
-    padding: 10px;
-    height: fit-content;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    border-radius: 10px;
-}
-
-.board-header > button{
-    float: right;
+    padding-bottom: var(--spacing-lg);
 }
 
 #board-form {
-    min-width: 300px;
-    max-width: 300px;
-    background-color: #252525;
-    color: #FDFDFD;
-    margin: 10px;
-    padding: 10px;
-    height: fit-content;
-    display: flex;
     flex-direction: row;
-    gap: 10px;
-    border-radius: 10px;
 }
 
-#board-form > input{
-    width: 200px;
+.board-header {
+    display: flex; 
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: var(--spacing-xs);
 }
 
-#board-form > button{
-    width: 100px;
+.board-header > span {
+    font-size: 1.1em;
+    font-weight: bold;
+    overflow-wrap: break-word;
+    display: inline-block;
+    max-width: 200px;
+}
+
+.task-list {
+    list-style-type: none;
+    padding: 0%;
+    margin: 0%;
+    margin-bottom: var(--spacing-sm);
+}
+
+/* TASK STYLING      */
+.task {
+    background-color: var(--color-background);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-sm);
+    margin-top: var(--spacing-xs);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.task-done {
+    background-color: var(--color-subtle-bg);
+    opacity: 0.8;
+}
+
+.task-done span:not(.task-edit) {
+    color: gray;
+    text-decoration: line-through;
+}
+
+.board > ul > li > span:nth-child(2) {
+    overflow-wrap: break-word;
+    max-width: 180px;
+}
+
+/* INPUT FIELDS      */
+input[type="text"] {
+    background-color: var(--color-subtle-bg);
+    color: var(--color-text);
+    border: 1px solid var(--color-subtle-bg);
+    border-radius: var(--border-radius);
+    padding: 8px;
+    font-family: var(--font-family);
+    box-sizing: border-box;
+}
+
+input[type="text"]:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 5px var(--color-accent);
+}
+
+/* BUTTONS & FORMS   */
+.task .mark-done-btn,
+.task-edit > button,
+.board-edit > button {
+    border: none;
+    background-color: var(--color-button-bg);
+    color: var(--color-text);
+    border-radius: 15px;
+    width: var(--button-size);
+    height: var(--button-size);
+    font-family: var(--font-family);
+    cursor: pointer;
+}
+
+.task .mark-done-btn{
+    align-self: top;
+}
+
+.task-done .mark-done-btn {
+    color: var(--color-accent);
+}
+
+.task-form button,
+#board-form button {
+    border: none;
+    background-color: var(--color-accent);
+    color: var(--color-background);
+    border-radius: var(--border-radius); 
+    padding: 8px 12px;
+    cursor: pointer;
+    font-family: var(--font-family);
+    font-weight: bold;
+}
+
+.task-form {
+    display: flex; 
+    gap: var(--spacing-sm);
+}
+
+.task-form input[type="text"],
+#board-form > input {
+    flex-grow: 1;
+}
+
+.task-edit {
+    margin-left: auto;
+    padding: 0%;
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.board-edit {
     float: right;
+    padding: 0%;
+}
+
+
+/* DROPDOWN MENUS    */
+.task-dropdown-content,
+.board-dropdown-content {
+    display: none;
+    position: absolute;
+    z-index: 1;
+    background-color: var(--color-card);
+    border-radius: var(--border-radius);
+}
+
+.task-dropdown-content button,
+.board-dropdown-content button {
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+    border: none;
+    background: none;
+    color: var(--color-text);
+    font-family: var(--font-family);
+    cursor: pointer;
+}
+
+.show {
+    display: block;
+}
+
+/* HOVER EFFECTS     */
+.appear-on-hover {
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.task:hover .appear-on-hover,
+.board-header:hover > .appear-on-hover {
+    opacity: 1;
 }

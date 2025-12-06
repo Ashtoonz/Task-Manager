@@ -3,7 +3,48 @@ document.addEventListener('DOMContentLoaded', fetchTaskBoard);
 const taskBoard = document.getElementById('task-board');
 const boardForm = document.getElementById('board-form');
 
-// --- GET (READ) Tasks ---
+// Dropdown Menu for Tasks
+function showTaskDropdown(board_id, task_id) {
+    document.getElementById(`task-dropdown-${board_id}-${task_id}`).classList.toggle("show");
+}
+
+// Dropdown Menu for Boards
+function showBoardDropdown(board_id) {
+    document.getElementById(`board-dropdown-${board_id}`).classList.toggle("show");
+}
+
+// Close Dropdown Menus When Screen is Clicked
+window.onclick = function(event) {
+    if (!event.target.matches('.task-dropdown-btn')) {
+        var dropdowns = document.getElementsByClassName("task-dropdown-content");
+        var i;
+        for (i = 0; i < dropdowns.length; i++) {
+            var openDropdown = dropdowns[i];
+            if (openDropdown.classList.contains('show')) {
+                openDropdown.classList.remove('show');
+            }
+        }
+    }
+    if (!event.target.matches('.board-dropdown-btn')) {
+        var dropdowns = document.getElementsByClassName("board-dropdown-content");
+        var i;
+        for (i = 0; i < dropdowns.length; i++) {
+            var openDropdown = dropdowns[i];
+            if (openDropdown.classList.contains('show')) {
+                openDropdown.classList.remove('show');
+            }
+        }
+    }
+}
+
+function closeDropdown(elementId) {
+    const dropdown = document.getElementById(elementId);
+    if (dropdown && dropdown.classList.contains('show')) {
+        dropdown.classList.remove('show');
+    }
+}
+
+// --- GET (READ) Task Board ---
 function fetchTaskBoard() {
     fetch('/task_board')
         .then(response => response.json())
@@ -14,16 +55,27 @@ function fetchTaskBoard() {
                 if(board.tasks.length > 0) {
                     board.tasks.forEach(task => {
                         tasks += `
-                        <li>
-                            <span>${task.title} (ID: ${task.id})</span>
-                            <button onclick="deleteTask(${board.id}, ${task.id})">Delete</button>
-                        </li>
-                    `
+                            <li class="task" onmouseleave="closeDropdown('task-dropdown-${board.id}-${task.id}')">
+                                <span>
+                                <button class="mark-done-btn">✓</button>
+                                </span>
+                                <span>${task.title}</span>
+                                <span class="task-edit appear-on-hover ">
+                                    <button class="task-dropdown-btn" onclick="showTaskDropdown(${board.id}, ${task.id})">≡</button>
+                                    <div id="task-dropdown-${board.id}-${task.id}" class="task-dropdown-content">
+                                        <button>Move Up</button>
+                                        <button>Move Down</button>
+                                        <button>Rename</button>
+                                    </div>
+                                    <button class="delete-task-btn" onclick="deleteTask(${board.id}, ${task.id})">X</button>
+                                </span>
+                            </li>
+                        `
                     });
                 } else {
                     tasks = `
-                        <li>
-                            <span>empty</span>
+                        <li class="task">
+                            <span>No tasks yet. You should add one!</span>
                         </li>
                     `
                 }
@@ -32,8 +84,16 @@ function fetchTaskBoard() {
                 boardCont.className = 'board';
                 boardCont.innerHTML = `
                     <div class="board-header">
-                        <span>${board.title} (ID: ${board.id})</span>
-                        <button onclick="deleteBoard(${board.id})">Delete</button>
+                        <span><b>${board.title}</b></span>
+                        <span class="board-edit appear-on-hover ">
+                            <button class="board-dropdown-btn" onclick="showBoardDropdown(${board.id})">≡</button>
+                            <div id="board-dropdown-${board.id}" class="board-dropdown-content">
+                                <button>Move Left</button>
+                                <button>Move Right</button>
+                                <button>Rename</button>
+                            </div>
+                            <button class="delete-board-btn" onclick="deleteBoard(${board.id})">X</button>
+                        </span>
                     </div>
                     <ul class="task-list">
                         ${tasks}

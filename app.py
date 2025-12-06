@@ -3,26 +3,8 @@ from flask import Flask, jsonify, request, render_template
 # Create the Flask application instance
 app = Flask(__name__)
 
-# A simple list to simulate a database for our To-Do items
-task_board = [
-    {
-        'id': 0,
-        'title': "testBoard0",
-        'tasks': [
-            {'id': 0, 'title': "testTask0", 'done': False},
-            {'id': 0, 'title': "testTask1", 'done': False},
-        ]
-    },
-    {
-        'id': 1,
-        'title': "testBoard1",
-        'tasks': [
-            {'id': 0, 'title': "testTask0", 'done': False},
-            {'id': 0, 'title': "testTask1", 'done': False},
-            {'id': 0, 'title': "testTask2", 'done': False},
-        ]
-    }
-]
+# Initialize Task Board
+task_board = []
 
 # New route to serve the main HTML file
 @app.route('/')
