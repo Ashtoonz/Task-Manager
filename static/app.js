@@ -1,11 +1,38 @@
 document.addEventListener('DOMContentLoaded', function() {
     fetchTaskBoard(); 
-
-    setInterval(fetchTaskBoard, 1000); 
+    startPolling(); 
 });
 
 const taskBoard = document.getElementById('task-board');
 const boardForm = document.getElementById('board-form');
+let fetchInterval = null;
+
+// --- POLLING CONTROL FUNCTIONS ---
+
+function startPolling() {
+    if (!fetchInterval) {
+        fetchInterval = setInterval(fetchTaskBoard, 1000); 
+        console.log("Polling started.");
+    }
+}
+
+function stopPolling() {
+    if (fetchInterval) {
+        clearInterval(fetchInterval);
+        fetchInterval = null;
+        console.log("Polling stopped.");
+    }
+}
+
+function attachPollingListeners() {
+    // Attach event listeners to ALL text inputs (board forms, task forms, etc.)
+    document.querySelectorAll('input[type="text"]').forEach(input => {
+        // When the input gains focus (user clicks in), stop polling
+        input.addEventListener('focus', stopPolling);
+        // When the input loses focus (user clicks away), restart polling
+        input.addEventListener('blur', startPolling);
+    });
+}
 
 // Dropdown Menu for Tasks
 function showTaskDropdown(board_id, task_id) {
@@ -165,10 +192,11 @@ function fetchTaskBoard() {
             openDropdownIds.forEach(id => {
                 const newDropdown = document.getElementById(id);
                 if (newDropdown) {
-                    // Re-apply the 'show' class to force the dropdown to appear open
                     newDropdown.classList.add('show'); 
                 }
             });
+
+            attachPollingListeners();
         })
         .catch(error => console.error('Error fetching task board:', error));
 }
