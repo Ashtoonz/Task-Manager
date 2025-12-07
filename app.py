@@ -44,7 +44,7 @@ class Task(db.Model):
         }
 
 # --- DATABASE HOOK ---
-@app.before_first_request
+@app.before_request
 def create_tables():
     print("Checking for database tables...")
     db.create_all()
