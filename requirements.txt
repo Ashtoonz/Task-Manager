@@ -1,3 +1,4 @@
 Flask
 gunicorn
-filelock
+Flask-SQLAlchemy
+psycopg2-binary

@@ -1,83 +1,65 @@
-import json
 import os
-from filelock import FileLock
 from flask import Flask, jsonify, request, render_template
+from flask_sqlalchemy import SQLAlchemy
 
-# Create the Flask application instance
+# --- APP AND DB SETUP ---
 app = Flask(__name__)
 
-# Initialize Task Board
-DATA_FILE = 'task_board_data.json'
-task_board = []
+database_url = os.environ.get('DATABASE_URL')
+if database_url:
+    database_url = database_url.replace("postgres://", "postgresql://")
+    
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///site.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Define the lock file object
-LOCK_FILE = DATA_FILE + ".lock"
-file_lock = FileLock(LOCK_FILE) # <-- NEW: Instantiate the lock object
+db = SQLAlchemy(app)
 
-# Save and load data methods
-def load_data():
-    global task_board
-    try:
-        with file_lock:
-            with open(DATA_FILE, 'r') as f:
-                task_board = json.load(f)
-                print(f"Loaded {len(task_board)} boards from {DATA_FILE}.")
-    except FileNotFoundError:
-        task_board = []
-        print("No data file found. Starting with an empty board.")
-    except json.JSONDecodeError:
-        task_board = []
-        print("Error decoding JSON file. Starting with an empty board.")
-    except Exception as e:
-        print(f"Error during load: {e}")
+# --- DATABASE MODELS ---
 
+class Board(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), nullable=False)
+    board_order = db.Column(db.Integer, nullable=False, default=0)
+    tasks = db.relationship('Task', backref='board', lazy=True, cascade="all, delete-orphan", order_by="Task.task_order")
 
-def save_data():
-    try:
-        with file_lock:
-            with open(DATA_FILE, 'w') as f:
-                json.dump(task_board, f, indent=4)
-                print(f"Saved {len(task_board)} boards to {DATA_FILE}.")
-    except Exception as e:
-        print(f"Error saving data: {e}")
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'tasks': [task.to_dict() for task in self.tasks]
+        }
 
-# New route to serve the main HTML file
+class Task(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    done = db.Column(db.Boolean, nullable=False, default=False)
+    task_order = db.Column(db.Integer, nullable=False, default=0)
+    board_id = db.Column(db.Integer, db.ForeignKey('board.id'), nullable=False)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'done': self.done,
+        }
+
+# --- DATABASE HOOK ---
+@app.before_first_request
+def create_tables():
+    print("Checking for database tables...")
+    db.create_all()
+    print("Database check complete.")
+
+# --- FLASK ROUTES (API Endpoints) ---
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# Helper methods
-def get_next_board_id():
-    max_id = max(b['id'] for b in task_board) if task_board else 0
-    return max_id + 1
-
-def find_board(board_id):
-    return next((b for b in task_board if b['id'] == board_id), None)
-
-def get_next_task_id(board_id):
-    board = find_board(board_id)
-    if not board:
-        return 1 
-        
-    if board['tasks']:
-        max_task_id = max(t['id'] for t in board['tasks'])
-        return max_task_id + 1
-    return 1
-
-## API Routes (Endpoints)
-
 ### GET /task_board (Retrieve All Boards)
 @app.route('/task_board', methods=['GET'])
 def get_task_board():
-    return jsonify({'task_board': task_board})
-
-### GET /task_board/<int:board_id> (Retrieve a Specific Board)
-@app.route('/task_board/<int:board_id>', methods=['GET'])
-def get_board(board_id):
-    board = next((b for b in task_board if b['id'] == board_id), None)
-    if board is None:
-        return jsonify({'error': 'Task not found'}), 404
-    return jsonify({'board': board})
+    all_boards = Board.query.order_by(Board.board_order).all()
+    return jsonify({'task_board': [b.to_dict() for b in all_boards]})
 
 ### POST /task_board (Create a New Board)
 @app.route('/task_board', methods=['POST'])
@@ -85,108 +67,104 @@ def create_board():
     if not request.json or 'title' not in request.json:
         return jsonify({'error': 'Missing title'}), 400
 
-    new_board = {
-        'id': get_next_board_id(),
-        'title': request.json['title'],
-        'tasks': []
-    }
-    task_board.append(new_board)
-    save_data()
-    return jsonify({'board': new_board}), 201
+    title = request.json['title']
+    
+    max_order = db.session.query(db.func.max(Board.board_order)).scalar() or 0
+    new_order = max_order + 1
+    
+    new_board = Board(title=title, board_order=new_order)
+    
+    db.session.add(new_board)
+    db.session.commit() 
+    
+    return jsonify({'board': new_board.to_dict()}), 201
 
-### POST /task_board/task (Create a New Board)
+### POST /tasks/<int:board_id> (Create a New Task)
 @app.route('/tasks/<int:board_id>', methods=['POST'])
 def create_task(board_id):
+    board = Board.query.get_or_404(board_id)
+
     if not request.json or 'title' not in request.json:
         return jsonify({'error': 'Missing title'}), 400
 
-    board = find_board(board_id)
-    if not board:
-        return jsonify({'error': 'Board not found'}), 404
+    title = request.json['title']
     
-    new_id = get_next_task_id(board_id)
+    max_order = db.session.query(db.func.max(Task.task_order)).filter_by(board_id=board_id).scalar() or 0
+    new_order = max_order + 1
 
-    new_task = {
-        'id': new_id,
-        'title': request.json['title'],
-        'done': False,
-    }
+    new_task = Task(title=title, board_id=board_id, task_order=new_order)
     
-    board['tasks'].append(new_task)
-    save_data()
+    db.session.add(new_task)
+    db.session.commit()
     
-    return jsonify({'task': new_task}), 201
+    return jsonify({'task': new_task.to_dict()}), 201
 
 ### DELETE /task_board/<int:board_id> (Delete a Board)
 @app.route('/task_board/<int:board_id>', methods=['DELETE'])
 def delete_board(board_id):
-    global task_board
-    task_board = [b for b in task_board if b['id'] != board_id]
-    save_data()
+    board = Board.query.get_or_404(board_id)
+    
+    db.session.delete(board)
+    db.session.commit()
+    
     return jsonify({'result': True})
 
-### DELETE /task_board/<int:board_id>/<int:task_id> (Delete a Task)
+### DELETE /tasks/<int:board_id>/<int:task_id> (Delete a Task)
 @app.route('/tasks/<int:board_id>/<int:task_id>', methods=['DELETE'])
 def delete_task(board_id, task_id):
-    board = find_board(board_id)
+    task = Task.query.filter_by(id=task_id, board_id=board_id).first_or_404()
     
-    if not board:
-        return jsonify({'error': 'Board not found'}), 404
-
-    original_task_count = len(board['tasks'])
-    board['tasks'] = [t for t in board['tasks'] if t['id'] != task_id]
+    db.session.delete(task)
+    db.session.commit()
     
-    if len(board['tasks']) < original_task_count:
-        save_data()
-        return jsonify({'result': True})
-        
-    return jsonify({'error': 'Task not found in board'}), 404
+    return jsonify({'result': True})
 
-### PATCH /task_board/<int:board_id>/move (Move a Task)
+### PATCH /task_board/<int:board_id>/move (Move a Board)
 @app.route('/task_board/<int:board_id>/move', methods=['PATCH'])
 def move_board(board_id):
     direction = request.json.get('direction')
+    current_board = Board.query.get_or_404(board_id)
     
-    board_index = next((i for i, t in enumerate(task_board) if t['id'] == board_id), -1)
-    
-    if board_index == -1:
-        return jsonify({'error': 'Task not found'}), 404
-
-    if direction == 'left' and board_index > 0:
-        task_board[board_index], task_board[board_index - 1] = task_board[board_index - 1], task_board[board_index]
-        save_data()
-    elif direction == 'right' and board_index < len(task_board) - 1:
-        task_board[board_index], task_board[board_index + 1] = task_board[board_index + 1], task_board[board_index]
-        save_data()
+    if direction == 'left':
+        target_board = Board.query.filter(Board.board_order < current_board.board_order).order_by(Board.board_order.desc()).first()
+    elif direction == 'right':
+        target_board = Board.query.filter(Board.board_order > current_board.board_order).order_by(Board.board_order.asc()).first()
     else:
+        return jsonify({'result': False, 'message': 'Invalid direction'}), 400
+
+    if not target_board:
         return jsonify({'result': False, 'message': 'Move not possible'}), 200
 
+    current_order = current_board.board_order
+    current_board.board_order = target_board.board_order
+    target_board.board_order = current_order
+    
+    db.session.commit() 
     return jsonify({'result': True}), 200
 
 ### PATCH /tasks/<int:board_id>/<int:task_id>/move (Move a Task)
 @app.route('/tasks/<int:board_id>/<int:task_id>/move', methods=['PATCH'])
 def move_task(board_id, task_id):
     direction = request.json.get('direction')
+    current_task = Task.query.filter_by(id=task_id, board_id=board_id).first_or_404()
     
-    board = find_board(board_id)
-    if not board:
-        return jsonify({'error': 'Board not found'}), 404
-        
-    tasks = board['tasks']
-    task_index = next((i for i, t in enumerate(tasks) if t['id'] == task_id), -1)
-    
-    if task_index == -1:
-        return jsonify({'error': 'Task not found'}), 404
+    q = Task.query.filter_by(board_id=board_id)
 
-    if direction == 'up' and task_index > 0:
-        tasks[task_index], tasks[task_index - 1] = tasks[task_index - 1], tasks[task_index]
-        save_data()
-    elif direction == 'down' and task_index < len(tasks) - 1:
-        tasks[task_index], tasks[task_index + 1] = tasks[task_index + 1], tasks[task_index]
-        save_data()
+    if direction == 'up':
+        target_task = q.filter(Task.task_order < current_task.task_order).order_by(Task.task_order.desc()).first()
+    elif direction == 'down':
+        target_task = q.filter(Task.task_order > current_task.task_order).order_by(Task.task_order.asc()).first()
     else:
+        return jsonify({'result': False, 'message': 'Invalid direction'}), 400
+
+    if not target_task:
         return jsonify({'result': False, 'message': 'Move not possible'}), 200
 
+    current_order = current_task.task_order
+    current_task.task_order = target_task.task_order
+    target_task.task_order = current_order
+    
+    db.session.commit()
     return jsonify({'result': True}), 200
 
 ### PATCH /task_board/<int:board_id>/rename (Rename a Board)
@@ -196,14 +174,12 @@ def rename_board(board_id):
         return jsonify({'error': 'Missing new title in request'}), 400
 
     new_title = request.json['title']
-    board = find_board(board_id)
+    board = Board.query.get_or_404(board_id)
 
-    if not board:
-        return jsonify({'error': 'Board not found'}), 404
-
-    board['title'] = new_title
-    save_data()
-    return jsonify({'result': True, 'board': board}), 200
+    board.title = new_title
+    db.session.commit()
+    
+    return jsonify({'result': True, 'board': board.to_dict()}), 200
 
 ### PATCH /tasks/<int:board_id>/<int:task_id>/rename (Rename a Task)
 @app.route('/tasks/<int:board_id>/<int:task_id>/rename', methods=['PATCH'])
@@ -212,44 +188,32 @@ def rename_task(board_id, task_id):
         return jsonify({'error': 'Missing new title in request'}), 400
 
     new_title = request.json['title']
-    board = find_board(board_id)
+    task = Task.query.filter_by(id=task_id, board_id=board_id).first_or_404()
     
-    if not board:
-        return jsonify({'error': 'Board not found'}), 404
-
-    task = next((t for t in board['tasks'] if t['id'] == task_id), None)
+    task.title = new_title
+    db.session.commit()
     
-    if task is None:
-        return jsonify({'error': 'Task not found'}), 404
-
-    task['title'] = new_title
-    save_data()
-    return jsonify({'result': True, 'task': task}), 200
+    return jsonify({'result': True, 'task': task.to_dict()}), 200
 
 ### PATCH /tasks/<int:board_id>/<int:task_id>/done (Toggle Task Done Status)
 @app.route('/tasks/<int:board_id>/<int:task_id>/done', methods=['PATCH'])
 def toggle_task_done(board_id, task_id):
     is_done = request.json.get('done')
 
-    board = find_board(board_id)
-    if not board:
-        return jsonify({'error': 'Board not found'}), 404
-        
-    task = next((t for t in board['tasks'] if t['id'] == task_id), None)
-    
-    if task is None:
-        return jsonify({'error': 'Task not found'}), 404
-
-    if is_done is not None:
-        task['done'] = is_done
-        save_data()
-        return jsonify({'result': True, 'task': task}), 200
-    else:
+    if is_done is None:
         return jsonify({'error': 'Missing "done" status in request'}), 400
+        
+    task = Task.query.filter_by(id=task_id, board_id=board_id).first_or_404()
 
-# Run the application
+    task.done = is_done
+    db.session.commit()
+    
+    return jsonify({'result': True, 'task': task.to_dict()}), 200
+
+
+# --- APPLICATION STARTUP ---
 if __name__ == '__main__':
-    load_data() 
-    # The debug check prevents running the built-in Flask server when Gunicorn is used
-    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true': 
-        app.run(debug=True)
+    with app.app_context():
+        db.create_all() 
+        
+    app.run(debug=True)
