@@ -1,4 +1,8 @@
-document.addEventListener('DOMContentLoaded', fetchTaskBoard);
+document.addEventListener('DOMContentLoaded', function() {
+    fetchTaskBoard(); 
+
+    setInterval(fetchTaskBoard, 1000); 
+});
 
 const taskBoard = document.getElementById('task-board');
 const boardForm = document.getElementById('board-form');
@@ -46,6 +50,19 @@ function closeDropdown(elementId) {
 
 // --- GET (READ) Task Board ---
 function fetchTaskBoard() {
+    const focusedElement = document.activeElement;
+    const focusedElementId = focusedElement.id;
+    let focusedElementValue = null;
+
+    if (focusedElement && focusedElement.matches('input[type="text"]')) {
+        focusedElementValue = focusedElement.value;
+    }
+
+    const openDropdownIds = [];
+    document.querySelectorAll('.task-dropdown-content.show, .board-dropdown-content.show').forEach(dropdown => {
+        openDropdownIds.push(dropdown.id);
+    });
+
     fetch('/task_board')
         .then(response => response.json())
         .then(data => {
@@ -54,18 +71,20 @@ function fetchTaskBoard() {
                 tasks = ``;
                 if(board.tasks.length > 0) {
                     board.tasks.forEach(task => {
+                        const doneClass = task.done ? 'task-done' : '';
+
                         tasks += `
-                            <li class="task" onmouseleave="closeDropdown('task-dropdown-${board.id}-${task.id}')">
+                            <li class="task ${doneClass}" onmouseleave="closeDropdown('task-dropdown-${board.id}-${task.id}')">
                                 <span>
-                                <button class="mark-done-btn">✓</button>
+                                    <button class="mark-done-btn" onclick="toggleTaskDone(${board.id}, ${task.id}, ${task.done})">✓</button>
                                 </span>
                                 <span>${task.title}</span>
                                 <span class="task-edit appear-on-hover ">
                                     <button class="task-dropdown-btn" onclick="showTaskDropdown(${board.id}, ${task.id})">≡</button>
                                     <div id="task-dropdown-${board.id}-${task.id}" class="task-dropdown-content">
-                                        <button>Move Up</button>
-                                        <button>Move Down</button>
-                                        <button>Rename</button>
+                                        <button onclick="moveTask(${board.id}, ${task.id}, 'up')">Move Up</button>
+                                        <button onclick="moveTask(${board.id}, ${task.id}, 'down')">Move Down</button>
+                                        <button onclick="renameTask(${board.id}, ${task.id}, 'right')">Rename</button>
                                     </div>
                                     <button class="delete-task-btn" onclick="deleteTask(${board.id}, ${task.id})">X</button>
                                 </span>
@@ -88,9 +107,9 @@ function fetchTaskBoard() {
                         <span class="board-edit appear-on-hover ">
                             <button class="board-dropdown-btn" onclick="showBoardDropdown(${board.id})">≡</button>
                             <div id="board-dropdown-${board.id}" class="board-dropdown-content">
-                                <button>Move Left</button>
-                                <button>Move Right</button>
-                                <button>Rename</button>
+                                <button onclick="moveBoard(${board.id}, 'left')">Move Left</button>
+                                <button onclick="moveBoard(${board.id}, 'right')">Move Right</button>
+                                <button onclick="renameBoard(${board.id}, 'right')">Rename</button>
                             </div>
                             <button class="delete-board-btn" onclick="deleteBoard(${board.id})">X</button>
                         </span>
@@ -103,27 +122,30 @@ function fetchTaskBoard() {
                         <button type="submit">Add Task</button>
                     </form>
                 `;
-
-                taskBoard.appendChild(boardCont);
-
-                document.querySelectorAll(".task-form").forEach(form => {
-                form.addEventListener('submit', function(e) {
+                
+                const taskForm = boardCont.querySelector('.task-form'); 
+                taskForm.addEventListener('submit', function(e) {
                     e.preventDefault();
-                    const title = document.getElementById(`task-title${board.id}`).value;
+                    const title = boardCont.querySelector(`#task-title${board.id}`).value; 
                     if(title) {
-                        addTask(board.id, title)
+                        addTask(board.id, title);
                     }
                 });
-            });
+
+                taskBoard.appendChild(boardCont);
             });
 
-            const boardAdd = document.createElement('form');
-            boardAdd.id = 'board-form';
+            const boardAdd = document.createElement('div');
+            boardAdd.id = 'board-add';
             boardAdd.innerHTML = `
-                <input type="text" id="board-title" placeholder="New Board Title" required autocomplete="off">
-                <button type="submit">Add Board</button>
+                <form id="board-form">
+                    <input type="text" id="board-title" placeholder="New Board Title" required autocomplete="off">
+                    <button type="submit">Add Board</button>
+                </form>
             `;
-            boardAdd.addEventListener('submit', function(e) {
+            taskBoard.appendChild(boardAdd);
+            
+            document.getElementById('board-form').addEventListener('submit', function(e) {
                 e.preventDefault();
                 const title = document.getElementById('board-title').value;
                 if(title) {
@@ -131,7 +153,22 @@ function fetchTaskBoard() {
                 }
             });
 
-            taskBoard.appendChild(boardAdd);
+
+            if (focusedElementId && focusedElementValue !== null) {
+                const newFocusedElement = document.getElementById(focusedElementId);
+                if (newFocusedElement) {
+                    newFocusedElement.value = focusedElementValue;
+                    newFocusedElement.focus();
+                }
+            }
+
+            openDropdownIds.forEach(id => {
+                const newDropdown = document.getElementById(id);
+                if (newDropdown) {
+                    // Re-apply the 'show' class to force the dropdown to appear open
+                    newDropdown.classList.add('show'); 
+                }
+            });
         })
         .catch(error => console.error('Error fetching task board:', error));
 }
@@ -202,4 +239,118 @@ function deleteTask(board_id, task_id) {
         }
     })
     .catch(error => console.error('Error deleting task:', error));
+}
+
+// --- PATCH (MOVE) Board Left or Right ---
+function moveBoard(board_id, direction) {
+    fetch(`/task_board/${board_id}/move`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ direction: direction })
+    })
+    .then(response => {
+        if (response.ok) {
+            console.log(`Board ${board_id} moved ${direction}.`);
+            fetchTaskBoard(); 
+        } else {
+            console.error(`Failed to move board ${direction}.`);
+        }
+    })
+    .catch(error => console.error('Error moving board:', error));
+}
+
+// --- PATCH (MOVE) Task Up or Down ---
+function moveTask(board_id, task_id, direction) {
+    fetch(`/tasks/${board_id}/${task_id}/move`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ direction: direction })
+    })
+    .then(response => {
+        if (response.ok) {
+            console.log(`Task ${task_id} moved ${direction}.`);
+            fetchTaskBoard(); 
+        } else {
+            console.error(`Failed to move task ${direction}.`);
+        }
+    })
+    .catch(error => console.error('Error moving task:', error));
+}
+
+// --- PATCH (UPDATE) Board Title ---
+function renameBoard(board_id) {
+    const new_title = prompt("Enter the new title for this board:");
+    
+    if (!new_title) {
+        return; 
+    }
+
+    fetch(`/task_board/${board_id}/rename`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ title: new_title })
+    })
+    .then(response => {
+        if (response.ok) {
+            console.log(`Board ${board_id} renamed to "${new_title}".`);
+            fetchTaskBoard();
+        } else {
+            console.error('Failed to rename board.');
+        }
+    })
+    .catch(error => console.error('Error renaming board:', error));
+}
+
+// --- PATCH (UPDATE) Task Title ---
+function renameTask(board_id, task_id) {
+    const new_title = prompt("Enter the new title for this task:");
+    
+    if (!new_title) {
+        return; 
+    }
+
+    fetch(`/tasks/${board_id}/${task_id}/rename`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ title: new_title })
+    })
+    .then(response => {
+        if (response.ok) {
+            console.log(`Task ${task_id} renamed to "${new_title}".`);
+            fetchTaskBoard(); 
+        } else {
+            console.error('Failed to rename task.');
+        }
+    })
+    .catch(error => console.error('Error renaming task:', error));
+}
+
+// --- PATCH (UPDATE) Task Done Status ---
+function toggleTaskDone(board_id, task_id, current_status) {
+    const new_status = !current_status; // Toggle the status
+
+    fetch(`/tasks/${board_id}/${task_id}/done`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ done: new_status })
+    })
+    .then(response => {
+        if (response.ok) {
+            console.log(`Task ${task_id} done status toggled to ${new_status}.`);
+            fetchTaskBoard(); 
+        } else {
+            console.error('Failed to toggle task done status.');
+        }
+    })
+    .catch(error => console.error('Error toggling task done status:', error));
 }

@@ -17,7 +17,7 @@
     --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-/* GLOBAL STYLES     */
+/* GLOBAL STYLES */
 body {
     background-color: var(--color-background);
     margin: 0%;
@@ -34,7 +34,7 @@ header > #title > h1 {
     margin: 0%;
 }
 
-/* BOARD LAYOUT      */
+/* BOARD LAYOUT */
 #task-board {
     justify-content: left;
     display: flex;
@@ -85,7 +85,7 @@ header > #title > h1 {
     margin-bottom: var(--spacing-sm);
 }
 
-/* TASK STYLING      */
+/* TASK STYLING */
 .task {
     background-color: var(--color-background);
     border-radius: var(--border-radius);
@@ -111,7 +111,7 @@ header > #title > h1 {
     max-width: 180px;
 }
 
-/* INPUT FIELDS      */
+/* INPUT FIELDS */
 input[type="text"] {
     background-color: var(--color-subtle-bg);
     color: var(--color-text);
@@ -128,7 +128,7 @@ input[type="text"]:focus {
     box-shadow: 0 0 5px var(--color-accent);
 }
 
-/* BUTTONS & FORMS   */
+/* BUTTONS & FORMS */
 .task .mark-done-btn,
 .task-edit > button,
 .board-edit > button {
@@ -144,10 +144,12 @@ input[type="text"]:focus {
 
 .task .mark-done-btn{
     align-self: top;
+    border: 1px;
+    border: var(--color-text);
 }
 
 .task-done .mark-done-btn {
-    color: var(--color-accent);
+    background-color: var(--color-accent);
 }
 
 .task-form button,
@@ -176,16 +178,18 @@ input[type="text"]:focus {
     margin-left: auto;
     padding: 0%;
     display: flex;
-    gap: var(--spacing-xs);
+    gap: 5px;
+    position: relative;
 }
 
 .board-edit {
     float: right;
     padding: 0%;
+    position: relative;
 }
 
 
-/* DROPDOWN MENUS    */
+/* DROPDOWN MENUS */
 .task-dropdown-content,
 .board-dropdown-content {
     display: none;
@@ -193,6 +197,12 @@ input[type="text"]:focus {
     z-index: 1;
     background-color: var(--color-card);
     border-radius: var(--border-radius);
+
+    min-width: 125px;
+
+    top: 100%; 
+    left: 0; 
+    margin-top: 5px;
 }
 
 .task-dropdown-content button,
@@ -205,16 +215,18 @@ input[type="text"]:focus {
     color: var(--color-text);
     font-family: var(--font-family);
     cursor: pointer;
+    width: 100%;
+    text-align: left;
 }
 
 .show {
     display: block;
 }
 
-/* HOVER EFFECTS     */
+/* HOVER EFFECTS */
 .appear-on-hover {
     opacity: 0;
-    transition: opacity 0.3s ease-in-out;
+    /* transition: opacity 0.3s ease-in-out; */
 }
 
 .task:hover .appear-on-hover,
