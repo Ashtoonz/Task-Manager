@@ -226,7 +226,7 @@ input[type="text"]:focus {
 /* HOVER EFFECTS */
 .appear-on-hover {
     opacity: 0;
-    /* transition: opacity 0.3s ease-in-out; */
+    transition: opacity 0.3s ease-in-out;
 }
 
 .task:hover .appear-on-hover,
