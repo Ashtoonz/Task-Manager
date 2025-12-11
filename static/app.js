@@ -6,7 +6,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 const taskBoard = document.getElementById('task-board');
 const boardForm = document.getElementById('board-form');
-var prevData;
 
 // Dropdown Menu for Tasks
 function showTaskDropdown(board_id, task_id) {
@@ -56,11 +55,9 @@ function fetchTaskBoard() {
         .then(data => {
             if(taskBoard.innerHTML.trim() === '') {
                 initTaskBoardContent(data);
-                prevData = data;
             }
             refreshTaskBoardContent(data);
 
-            prevData = data;
         })
         .catch(error => console.error('Error fetching task board:', error));
 }
